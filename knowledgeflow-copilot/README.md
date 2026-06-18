@@ -154,6 +154,7 @@ Copy-Item .env.example .env
 LLM_PROVIDER=auto
 OPENAI_API_KEY=你的 API Key
 OPENAI_MODEL=gpt-5.5
+OPENAI_SYSTEM_PROMPT=你是 KnowledgeFlow Copilot 的学习助手。回答要简洁、准确，适合 Python 大模型应用开发初学者。
 LLM_TIMEOUT_SECONDS=30
 ```
 

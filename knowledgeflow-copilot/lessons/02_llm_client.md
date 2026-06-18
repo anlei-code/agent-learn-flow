@@ -63,6 +63,7 @@ schemas.py 只处理输入输出结构
 LLM_PROVIDER=auto
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-5.5
+OPENAI_SYSTEM_PROMPT=你是 KnowledgeFlow Copilot 的学习助手。回答要简洁、准确，适合 Python 大模型应用开发初学者。
 LLM_TIMEOUT_SECONDS=30
 ```
 
@@ -113,10 +114,10 @@ LLM_TIMEOUT_SECONDS=30
 `LLMClient.chat()` 是统一入口：
 
 ```python
-def chat(self, message: str) -> LLMResult:
+def chat(self, message: str, temperature: float) -> LLMResult:
     provider = self._active_provider()
     if provider == "mock":
-        return self._mock_chat(message)
+        return self._mock_chat(message, temperature)
     return self._openai_chat(message)
 ```
 
@@ -151,18 +152,30 @@ print(response.output_text)
 - 现在 `ChatRequest` 里已经有 `temperature` 字段。
 - 把它传入 `LLMClient.chat()`。
 - 先只在 mock 回复中显示 temperature。
+- 完成状态：已完成。
 
 练习 2：新增 `system_prompt`
 
 - 在 `.env` 中新增 `OPENAI_SYSTEM_PROMPT`。
 - 在 `Settings` 中读取。
 - 在 `_openai_chat()` 中替代写死的 `instructions`。
+- 完成状态：已完成。
 
 练习 3：错误处理
 
 - 把 `LLM_PROVIDER=openai` 且没有 API Key 的情况手动测一遍。
 - 观察 `/api/v1/chat` 是否返回 503。
 - 给这个行为补一个测试。
+- 完成状态：已完成，测试名为 `test_chat_returns_503_when_openai_provider_has_no_key`。
+
+## 本课练习完成记录
+
+- `/api/v1/chat` 已经把 `ChatRequest.temperature` 传入 `LLMClient.chat()`。
+- mock 回复中会显示当前 temperature。
+- `.env`、`.env.example` 和 `Settings` 已新增 `OPENAI_SYSTEM_PROMPT`。
+- `_openai_chat()` 已使用 `self.settings.openai_system_prompt` 作为 OpenAI Responses API 的 `instructions`。
+- `LLM_PROVIDER=openai` 且没有 `OPENAI_API_KEY` 时，`/api/v1/chat` 返回 503。
+- 已补充 503 行为测试。
 
 ## 本课验收
 
@@ -172,4 +185,3 @@ print(response.output_text)
 - `LLM_PROVIDER=auto` 是怎么决定 active provider 的。
 - 为什么测试里要强制设置 `LLM_PROVIDER=mock`。
 - `.env`、`Settings`、`LLMClient`、`routes.py` 之间的调用链。
-

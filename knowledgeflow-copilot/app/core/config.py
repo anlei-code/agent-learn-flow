@@ -4,6 +4,11 @@ from typing import Literal
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+DEFAULT_OPENAI_SYSTEM_PROMPT = (
+    "你是 KnowledgeFlow Copilot 的学习助手。"
+    "回答要简洁、准确，适合 Python 大模型应用开发初学者。"
+)
+
 
 class Settings(BaseSettings):
     app_name: str = Field(default="KnowledgeFlow Copilot", validation_alias="APP_NAME")
@@ -18,6 +23,10 @@ class Settings(BaseSettings):
     )
     openai_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-5.5", validation_alias="OPENAI_MODEL")
+    openai_system_prompt: str = Field(
+        default=DEFAULT_OPENAI_SYSTEM_PROMPT,
+        validation_alias="OPENAI_SYSTEM_PROMPT",
+    )
     llm_timeout_seconds: float = Field(default=30.0, validation_alias="LLM_TIMEOUT_SECONDS")
 
     model_config = SettingsConfigDict(

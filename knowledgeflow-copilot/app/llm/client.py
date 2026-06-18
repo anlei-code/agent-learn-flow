@@ -42,10 +42,10 @@ class LLMClient:
             has_api_key=self._has_openai_key(),
         )
 
-    def chat(self, message: str) -> LLMResult:
+    def chat(self, message: str, temperature: float) -> LLMResult:
         provider = self._active_provider()
         if provider == "mock":
-            return self._mock_chat(message)
+            return self._mock_chat(message, temperature)
         return self._openai_chat(message)
 
     def _active_provider(self) -> str:
@@ -60,12 +60,13 @@ class LLMClient:
     def _has_openai_key(self) -> bool:
         return bool(self.settings.openai_api_key and self.settings.openai_api_key.strip())
 
-    def _mock_chat(self, message: str) -> LLMResult:
+    def _mock_chat(self, message: str, temperature: float) -> LLMResult:
         words = message.split()
         token_estimate = max(1, len(words)) + 32
         return LLMResult(
             reply=(
                 f"收到你的问题：{message}\n"
+                f"当前 temperature={temperature}。\n"
                 "这是第二课的本地 mock 回复。"
                 "当你在 .env 中设置 OPENAI_API_KEY 后，/chat 会切换到真实 LLM 调用。"
             ),
@@ -86,10 +87,7 @@ class LLMClient:
         try:
             response = client.responses.create(
                 model=self.settings.openai_model,
-                instructions=(
-                    "你是 KnowledgeFlow Copilot 的学习助手。"
-                    "回答要简洁、准确，适合 Python 大模型应用开发初学者。"
-                ),
+                instructions=self.settings.openai_system_prompt,
                 input=message,
             )
         except OpenAIError as exc:

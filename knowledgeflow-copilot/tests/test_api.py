@@ -1,3 +1,6 @@
+from app.core.config import get_settings
+
+
 def test_health_check(client):
     response = client.get("/api/v1/health")
 
@@ -56,7 +59,11 @@ def test_llm_status_uses_mock_provider(client):
 def test_chat_uses_llm_client_mock_when_no_key(client):
     response = client.post(
         "/api/v1/chat",
-        json={"message": "请解释什么是 LLM Client", "session_id": "session-002"},
+        json={
+            "message": "请解释什么是 LLM Client",
+            "session_id": "session-002",
+            "temperature": 0.7,
+        },
     )
 
     assert response.status_code == 200
@@ -66,6 +73,20 @@ def test_chat_uses_llm_client_mock_when_no_key(client):
     assert body["session_id"] == "session-002"
     assert body["used_mock"] is True
     assert "第二课" in body["reply"]
+    assert "temperature=0.7" in body["reply"]
+
+
+def test_chat_returns_503_when_openai_provider_has_no_key(client, monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    get_settings.cache_clear()
+
+    response = client.post("/api/v1/chat", json={"message": "测试配置错误"})
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "OPENAI_API_KEY is required when LLM_PROVIDER=openai."
+    }
 
 
 def test_mock_chat_rejects_short_message(client):

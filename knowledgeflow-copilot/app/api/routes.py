@@ -73,7 +73,7 @@ def llm_status() -> LLMStatusResponse:
 def chat(payload: ChatRequest) -> LLMChatResponse:
     client = LLMClient(get_settings())
     try:
-        result = client.chat(payload.message)
+        result = client.chat(payload.message, payload.temperature)
     except LLMConfigurationError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except LLMProviderError as exc:
