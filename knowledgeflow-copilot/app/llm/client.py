@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from openai import OpenAI, OpenAIError
 
 from app.core.config import Settings
+from app.schemas import ActionItem, ActionItemsPayload
 
 
 class LLMConfigurationError(RuntimeError):
@@ -16,6 +17,15 @@ class LLMProviderError(RuntimeError):
 @dataclass(frozen=True)
 class LLMResult:
     reply: str
+    provider: str
+    model: str
+    used_mock: bool
+    tokens_used: int | None = None
+
+
+@dataclass(frozen=True)
+class ActionItemExtractionResult:
+    items: list[ActionItem]
     provider: str
     model: str
     used_mock: bool
@@ -47,6 +57,12 @@ class LLMClient:
         if provider == "mock":
             return self._mock_chat(message, temperature)
         return self._openai_chat(message)
+
+    def extract_action_items(self, text: str, temperature: float) -> ActionItemExtractionResult:
+        provider = self._active_provider()
+        if provider == "mock":
+            return self._mock_extract_action_items(text)
+        return self._openai_extract_action_items(text, temperature)
 
     def _active_provider(self) -> str:
         if self.settings.llm_provider == "mock":
@@ -100,6 +116,118 @@ class LLMClient:
             used_mock=False,
             tokens_used=self._extract_total_tokens(response),
         )
+
+    def _mock_extract_action_items(self, text: str) -> ActionItemExtractionResult:
+        fragments = self._split_action_fragments(text)
+        items = [
+            ActionItem(
+                title=self._clean_action_title(fragment),
+                owner=self._guess_owner(fragment),
+                due_date=self._guess_due_date(fragment),
+                priority=self._guess_priority(fragment),
+                source_text=fragment,
+            )
+            for fragment in fragments
+        ]
+        return ActionItemExtractionResult(
+            items=items,
+            provider="mock",
+            model="mock-stage-3",
+            used_mock=True,
+            tokens_used=max(1, len(text.split())) + 24,
+        )
+
+    def _openai_extract_action_items(
+        self,
+        text: str,
+        temperature: float,
+    ) -> ActionItemExtractionResult:
+        if not self._has_openai_key():
+            raise LLMConfigurationError("OPENAI_API_KEY is required when LLM_PROVIDER=openai.")
+
+        client = OpenAI(
+            api_key=self.settings.openai_api_key,
+            timeout=self.settings.llm_timeout_seconds,
+        )
+        try:
+            response = client.responses.parse(
+                model=self.settings.openai_model,
+                instructions=(
+                    f"{self.settings.openai_system_prompt}\n"
+                    "请从用户文本中抽取行动项。没有明确行动项时返回空 items。"
+                    "due_date 保留原文中的时间表达，owner 保留原文中的负责人。"
+                ),
+                input=text,
+                text_format=ActionItemsPayload,
+                temperature=temperature,
+            )
+        except OpenAIError as exc:
+            raise LLMProviderError(str(exc)) from exc
+
+        parsed = response.output_parsed
+        items = parsed.items if parsed is not None else []
+        return ActionItemExtractionResult(
+            items=items,
+            provider="openai",
+            model=self.settings.openai_model,
+            used_mock=False,
+            tokens_used=self._extract_total_tokens(response),
+        )
+
+    def _split_action_fragments(self, text: str) -> list[str]:
+        separators = ["\n", "。", "；", ";", "，", ","]
+        fragments = [text.strip()]
+        for separator in separators:
+            next_fragments: list[str] = []
+            for fragment in fragments:
+                next_fragments.extend(part.strip() for part in fragment.split(separator))
+            fragments = next_fragments
+
+        action_keywords = [
+            "完成",
+            "整理",
+            "开发",
+            "测试",
+            "提交",
+            "修复",
+            "跟进",
+            "负责",
+            "todo",
+            "TODO",
+        ]
+        return [
+            fragment
+            for fragment in fragments
+            if fragment and any(keyword in fragment for keyword in action_keywords)
+        ]
+
+    def _clean_action_title(self, fragment: str) -> str:
+        return fragment.strip(" -:：，。；;")
+
+    def _guess_owner(self, fragment: str) -> str | None:
+        markers = ["由", "负责人：", "负责人:"]
+        for marker in markers:
+            if marker not in fragment:
+                continue
+            tail = fragment.split(marker, 1)[1].strip()
+            if not tail:
+                return None
+            return tail.split()[0].strip("，,。；;:：")
+        return None
+
+    def _guess_due_date(self, fragment: str) -> str | None:
+        due_keywords = ["今天", "明天", "后天", "本周", "下周", "月底", "周一", "周五"]
+        for keyword in due_keywords:
+            if keyword in fragment:
+                return keyword
+        return None
+
+    def _guess_priority(self, fragment: str) -> str:
+        if any(keyword in fragment for keyword in ["紧急", "尽快", "马上", "高优"]):
+            return "high"
+        if any(keyword in fragment for keyword in ["可选", "有空", "低优"]):
+            return "low"
+        return "medium"
 
     def _extract_total_tokens(self, response: object) -> int | None:
         usage = getattr(response, "usage", None)

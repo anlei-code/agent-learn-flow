@@ -77,6 +77,41 @@ class LLMStatusResponse(BaseModel):
     has_api_key: bool
 
 
+class ActionItem(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    owner: str | None = Field(default=None, max_length=50)
+    due_date: str | None = Field(default=None, max_length=50)
+    priority: Literal["low", "medium", "high"] = "medium"
+    source_text: str = Field(min_length=1, max_length=500)
+
+
+class ActionItemsPayload(BaseModel):
+    items: list[ActionItem]
+
+
+class ActionItemsRequest(BaseModel):
+    text: str = Field(
+        min_length=5,
+        max_length=4000,
+        description="Text to extract action items from.",
+        examples=["明天前由小李完成接口测试，下周整理学习笔记。"],
+    )
+    temperature: float = Field(
+        default=0.1,
+        ge=0,
+        le=2,
+        description="Reserved for real LLM structured extraction.",
+    )
+
+
+class ActionItemsResponse(BaseModel):
+    items: list[ActionItem]
+    provider: str
+    model: str
+    used_mock: bool
+    tokens_used: int | None = Field(default=None, ge=0)
+
+
 class StudyStatusResponse(BaseModel):
     stage_name: str
     goals: list[str]

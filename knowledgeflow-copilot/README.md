@@ -171,3 +171,36 @@ http://127.0.0.1:8000/docs
 ```
 
 先调用 `GET /api/v1/llm/status`，确认 `active_provider` 是否为 `openai`。
+
+### POST /api/v1/extract/action-items
+
+结构化信息抽取接口。它把一段文本抽取成稳定的 `items: list[ActionItem]`。
+
+请求：
+
+```json
+{
+  "text": "明天前由小李完成接口测试。下周整理学习笔记。",
+  "temperature": 0.1
+}
+```
+
+返回：
+
+```json
+{
+  "items": [
+    {
+      "title": "明天前由小李完成接口测试",
+      "owner": "小李完成接口测试",
+      "due_date": "明天",
+      "priority": "medium",
+      "source_text": "明天前由小李完成接口测试"
+    }
+  ],
+  "provider": "mock",
+  "model": "mock-stage-3",
+  "used_mock": true,
+  "tokens_used": 28
+}
+```

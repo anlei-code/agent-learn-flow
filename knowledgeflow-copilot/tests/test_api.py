@@ -89,6 +89,31 @@ def test_chat_returns_503_when_openai_provider_has_no_key(client, monkeypatch):
     }
 
 
+def test_extract_action_items_uses_mock_structured_output(client):
+    response = client.post(
+        "/api/v1/extract/action-items",
+        json={
+            "text": "明天前由小李完成接口测试。下周整理学习笔记。",
+            "temperature": 0.1,
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider"] == "mock"
+    assert body["model"] == "mock-stage-3"
+    assert body["used_mock"] is True
+    assert len(body["items"]) == 2
+    assert body["items"][0]["due_date"] == "明天"
+    assert body["items"][0]["priority"] == "medium"
+
+
+def test_extract_action_items_rejects_short_text(client):
+    response = client.post("/api/v1/extract/action-items", json={"text": "短"})
+
+    assert response.status_code == 422
+
+
 def test_mock_chat_rejects_short_message(client):
     response = client.post("/api/v1/chat/mock", json={"message": "好"})
 
@@ -100,9 +125,6 @@ def test_study_status(client):
 
     assert response.status_code == 200
     body = response.json()
-    assert body["stage_name"] == "第二课：LLM Client 封装"
-    assert "理解为什么要封装 LLMClient" in body["goals"]
-    assert (
-        body["next_step"]
-        == "完成第二课练习：传递 temperature、自定义 system prompt、补充 503 测试。"
-    )
+    assert body["stage_name"] == "第三课：结构化输出与信息抽取"
+    assert "理解为什么大模型应用需要稳定输出结构" in body["goals"]
+    assert body["next_step"] == "阅读第三课讲义，并手动调用 /api/v1/extract/action-items。"

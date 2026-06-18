@@ -5,6 +5,8 @@ from fastapi import APIRouter, HTTPException
 from app.core.config import get_settings
 from app.llm.client import LLMClient, LLMConfigurationError, LLMProviderError
 from app.schemas import (
+    ActionItemsRequest,
+    ActionItemsResponse,
     ChatRequest,
     ChatResponse,
     EchoRequest,
@@ -89,15 +91,34 @@ def chat(payload: ChatRequest) -> LLMChatResponse:
     )
 
 
+@router.post("/extract/action-items", response_model=ActionItemsResponse, tags=["llm"])
+def extract_action_items(payload: ActionItemsRequest) -> ActionItemsResponse:
+    client = LLMClient(get_settings())
+    try:
+        result = client.extract_action_items(payload.text, payload.temperature)
+    except LLMConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except LLMProviderError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return ActionItemsResponse(
+        items=result.items,
+        provider=result.provider,
+        model=result.model,
+        used_mock=result.used_mock,
+        tokens_used=result.tokens_used,
+    )
+
+
 @router.get("/study/status", response_model=StudyStatusResponse, tags=["learning"])
 def study_status() -> StudyStatusResponse:
     return StudyStatusResponse(
-        stage_name="第二课：LLM Client 封装",
+        stage_name="第三课：结构化输出与信息抽取",
         goals=[
-            "理解为什么要封装 LLMClient",
-            "会用环境变量切换 mock 和 OpenAI provider",
-            "会通过 FastAPI 暴露统一聊天接口",
-            "会在测试中避免真实调用外部 API",
+            "理解为什么大模型应用需要稳定输出结构",
+            "会用 Pydantic 定义抽取结果",
+            "会通过接口返回 list[ActionItem]",
+            "会用 mock 方式测试结构化输出",
         ],
-        next_step="完成第二课练习：传递 temperature、自定义 system prompt、补充 503 测试。",
+        next_step="阅读第三课讲义，并手动调用 /api/v1/extract/action-items。",
     )
