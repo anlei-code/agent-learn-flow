@@ -34,6 +34,14 @@ uv run uvicorn app.main:app --reload
 - API 文档：http://127.0.0.1:8000/docs
 - 健康检查：http://127.0.0.1:8000/api/v1/health
 
+如果 PowerShell 提示 `uv` 无法识别，说明 PATH 还没有刷新。先关闭当前 PowerShell，重新打开后再试。也可以临时使用完整路径：
+
+```powershell
+& "$env:APPDATA\Python\Python310\Scripts\uv.exe" --version
+& "$env:APPDATA\Python\Python310\Scripts\uv.exe" sync --extra dev
+& "$env:APPDATA\Python\Python310\Scripts\uv.exe" run pytest
+```
+
 ## 不使用 uv 的启动方式
 
 ```powershell
@@ -83,4 +91,3 @@ Copy-Item .env.example .env
   "temperature": 0.2
 }
 ```
-
