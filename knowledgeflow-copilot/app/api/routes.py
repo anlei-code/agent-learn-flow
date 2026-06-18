@@ -3,7 +3,14 @@ from datetime import datetime, timezone
 from fastapi import APIRouter
 
 from app.core.config import get_settings
-from app.schemas import ChatRequest, ChatResponse, EchoRequest, EchoResponse, HealthResponse
+from app.schemas import (
+    ChatRequest,
+    ChatResponse,
+    EchoRequest,
+    EchoResponse,
+    HealthResponse,
+    StudyStatusResponse,
+)
 
 router = APIRouter()
 
@@ -25,6 +32,7 @@ def echo(payload: EchoRequest) -> EchoResponse:
     return EchoResponse(
         message=payload.message,
         uppercase=payload.message.upper(),
+        reversed_message=payload.message[::-1],
         length=len(payload.message),
         request_id=payload.request_id,
     )
@@ -46,3 +54,17 @@ def mock_chat(payload: ChatRequest) -> ChatResponse:
         tokens_used=token_estimate,
     )
 
+
+@router.get("/study/status", response_model=StudyStatusResponse, tags=["learning"])
+def study_status() -> StudyStatusResponse:
+    return StudyStatusResponse(
+        stage_name="第一阶段：Python 后端基础",
+        goals=[
+            "会启动一个 FastAPI 服务",
+            "会用 Pydantic 定义请求和响应",
+            "会用环境变量管理配置",
+            "会写基础接口测试",
+            "会读懂一个可扩展项目结构",
+        ],
+        next_step="继续完成第一阶段练习，然后进入真实 LLM Client 封装。",
+    )

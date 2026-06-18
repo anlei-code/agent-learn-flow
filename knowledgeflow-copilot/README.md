@@ -104,6 +104,8 @@ Copy-Item .env.example .env
 }
 ```
 
+响应会返回原文、大写、反转字符串和长度。
+
 ### POST /api/v1/chat/mock
 
 模拟聊天接口。这个接口不调用真实大模型，只用于提前熟悉聊天 API 的结构。
@@ -117,3 +119,7 @@ Copy-Item .env.example .env
   "temperature": 0.2
 }
 ```
+
+### GET /api/v1/study/status
+
+返回当前学习阶段、阶段目标和下一步建议。

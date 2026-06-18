@@ -29,13 +29,14 @@ class EchoRequest(BaseModel):
 class EchoResponse(BaseModel):
     message: str
     uppercase: str
+    reversed_message: str
     length: int = Field(ge=0)
     request_id: str | None = None
 
 
 class ChatRequest(BaseModel):
     message: str = Field(
-        min_length=1,
+        min_length=2,
         max_length=2000,
         description="User message. This mock endpoint does not call a real LLM yet.",
         examples=["我今天开始学习大模型应用开发"],
@@ -59,3 +60,8 @@ class ChatResponse(BaseModel):
     session_id: str | None = None
     tokens_used: int = Field(ge=0)
 
+
+class StudyStatusResponse(BaseModel):
+    stage_name: str
+    goals: list[str]
+    next_step: str
