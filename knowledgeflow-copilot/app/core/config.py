@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -11,6 +12,13 @@ class Settings(BaseSettings):
     debug: bool = Field(default=True, validation_alias="APP_DEBUG")
     api_prefix: str = Field(default="/api/v1", validation_alias="APP_API_PREFIX")
     log_level: str = Field(default="INFO", validation_alias="APP_LOG_LEVEL")
+    llm_provider: Literal["auto", "mock", "openai"] = Field(
+        default="auto",
+        validation_alias="LLM_PROVIDER",
+    )
+    openai_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
+    openai_model: str = Field(default="gpt-5.5", validation_alias="OPENAI_MODEL")
+    llm_timeout_seconds: float = Field(default=30.0, validation_alias="LLM_TIMEOUT_SECONDS")
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -22,4 +30,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-

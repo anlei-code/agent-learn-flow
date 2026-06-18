@@ -12,6 +12,7 @@
 - 如何用环境变量管理配置。
 - 如何写最小可用测试。
 - 如何为后续 LLM/RAG 项目打基础。
+- 如何封装一个可切换 mock/OpenAI 的 LLM Client。
 
 ## 推荐环境
 
@@ -123,3 +124,49 @@ Copy-Item .env.example .env
 ### GET /api/v1/study/status
 
 返回当前学习阶段、阶段目标和下一步建议。
+
+### GET /api/v1/llm/status
+
+查看当前 LLM 配置状态。这个接口不会返回 API Key 明文，只会告诉你是否配置了 Key。
+
+### POST /api/v1/chat
+
+统一聊天入口。默认 `LLM_PROVIDER=auto`：
+
+- 如果 `.env` 里没有 `OPENAI_API_KEY`，会走本地 mock。
+- 如果 `.env` 里设置了 `OPENAI_API_KEY`，会调用 OpenAI Responses API。
+
+请求：
+
+```json
+{
+  "message": "请解释什么是 LLM Client",
+  "session_id": "s2",
+  "temperature": 0.2
+}
+```
+
+## 使用真实 OpenAI API
+
+编辑 `.env`：
+
+```env
+LLM_PROVIDER=auto
+OPENAI_API_KEY=你的 API Key
+OPENAI_MODEL=gpt-5.5
+LLM_TIMEOUT_SECONDS=30
+```
+
+然后启动服务：
+
+```powershell
+uv run uvicorn app.main:app --reload
+```
+
+打开：
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+先调用 `GET /api/v1/llm/status`，确认 `active_provider` 是否为 `openai`。

@@ -61,6 +61,22 @@ class ChatResponse(BaseModel):
     tokens_used: int = Field(ge=0)
 
 
+class LLMChatResponse(BaseModel):
+    reply: str
+    provider: str
+    model: str
+    session_id: str | None = None
+    used_mock: bool
+    tokens_used: int | None = Field(default=None, ge=0)
+
+
+class LLMStatusResponse(BaseModel):
+    configured_provider: str
+    active_provider: str
+    model: str
+    has_api_key: bool
+
+
 class StudyStatusResponse(BaseModel):
     stage_name: str
     goals: list[str]

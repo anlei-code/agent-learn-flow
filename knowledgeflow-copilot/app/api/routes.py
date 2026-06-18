@@ -1,14 +1,17 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from app.core.config import get_settings
+from app.llm.client import LLMClient, LLMConfigurationError, LLMProviderError
 from app.schemas import (
     ChatRequest,
     ChatResponse,
     EchoRequest,
     EchoResponse,
     HealthResponse,
+    LLMChatResponse,
+    LLMStatusResponse,
     StudyStatusResponse,
 )
 
@@ -55,16 +58,46 @@ def mock_chat(payload: ChatRequest) -> ChatResponse:
     )
 
 
+@router.get("/llm/status", response_model=LLMStatusResponse, tags=["llm"])
+def llm_status() -> LLMStatusResponse:
+    status = LLMClient(get_settings()).status()
+    return LLMStatusResponse(
+        configured_provider=status.configured_provider,
+        active_provider=status.active_provider,
+        model=status.model,
+        has_api_key=status.has_api_key,
+    )
+
+
+@router.post("/chat", response_model=LLMChatResponse, tags=["llm"])
+def chat(payload: ChatRequest) -> LLMChatResponse:
+    client = LLMClient(get_settings())
+    try:
+        result = client.chat(payload.message)
+    except LLMConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except LLMProviderError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return LLMChatResponse(
+        reply=result.reply,
+        provider=result.provider,
+        model=result.model,
+        session_id=payload.session_id,
+        used_mock=result.used_mock,
+        tokens_used=result.tokens_used,
+    )
+
+
 @router.get("/study/status", response_model=StudyStatusResponse, tags=["learning"])
 def study_status() -> StudyStatusResponse:
     return StudyStatusResponse(
-        stage_name="第一阶段：Python 后端基础",
+        stage_name="第二课：LLM Client 封装",
         goals=[
-            "会启动一个 FastAPI 服务",
-            "会用 Pydantic 定义请求和响应",
-            "会用环境变量管理配置",
-            "会写基础接口测试",
-            "会读懂一个可扩展项目结构",
+            "理解为什么要封装 LLMClient",
+            "会用环境变量切换 mock 和 OpenAI provider",
+            "会通过 FastAPI 暴露统一聊天接口",
+            "会在测试中避免真实调用外部 API",
         ],
-        next_step="继续完成第一阶段练习，然后进入真实 LLM Client 封装。",
+        next_step="完成第二课练习：传递 temperature、自定义 system prompt、补充 503 测试。",
     )

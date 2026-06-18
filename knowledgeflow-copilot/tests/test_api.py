@@ -43,6 +43,31 @@ def test_mock_chat(client):
     assert body["tokens_used"] > 0
 
 
+def test_llm_status_uses_mock_provider(client):
+    response = client.get("/api/v1/llm/status")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["configured_provider"] == "mock"
+    assert body["active_provider"] == "mock"
+    assert body["has_api_key"] is False
+
+
+def test_chat_uses_llm_client_mock_when_no_key(client):
+    response = client.post(
+        "/api/v1/chat",
+        json={"message": "请解释什么是 LLM Client", "session_id": "session-002"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider"] == "mock"
+    assert body["model"] == "mock-stage-2"
+    assert body["session_id"] == "session-002"
+    assert body["used_mock"] is True
+    assert "第二课" in body["reply"]
+
+
 def test_mock_chat_rejects_short_message(client):
     response = client.post("/api/v1/chat/mock", json={"message": "好"})
 
@@ -54,6 +79,9 @@ def test_study_status(client):
 
     assert response.status_code == 200
     body = response.json()
-    assert body["stage_name"] == "第一阶段：Python 后端基础"
-    assert "会启动一个 FastAPI 服务" in body["goals"]
-    assert body["next_step"] == "继续完成第一阶段练习，然后进入真实 LLM Client 封装。"
+    assert body["stage_name"] == "第二课：LLM Client 封装"
+    assert "理解为什么要封装 LLMClient" in body["goals"]
+    assert (
+        body["next_step"]
+        == "完成第二课练习：传递 temperature、自定义 system prompt、补充 503 测试。"
+    )
