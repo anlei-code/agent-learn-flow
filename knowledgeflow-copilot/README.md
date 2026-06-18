@@ -42,6 +42,32 @@ uv run uvicorn app.main:app --reload
 & "$env:APPDATA\Python\Python310\Scripts\uv.exe" run pytest
 ```
 
+如果执行 `uv venv` 时提示 `.venv` 已存在，通常不需要重建，直接运行：
+
+```powershell
+uv sync --extra dev
+```
+
+如果你已经选择重建，并遇到 `failed to remove directory .venv\Lib: 拒绝访问`，说明有 Python、uvicorn 或终端正在占用虚拟环境。先停止服务、关闭占用 `.venv` 的终端，必要时执行：
+
+```powershell
+Get-CimInstance Win32_Process |
+  Where-Object { $_.CommandLine -like '*knowledgeflow-copilot*' -or $_.CommandLine -like '*uvicorn*' } |
+  Select-Object ProcessId,Name,CommandLine
+```
+
+确认没有项目进程后再修复：
+
+```powershell
+$env:TEMP = 'D:\uv-temp'
+$env:TMP = 'D:\uv-temp'
+$env:UV_CACHE_DIR = 'D:\uv-cache'
+New-Item -ItemType Directory -Force -Path $env:TEMP, $env:UV_CACHE_DIR
+uv venv --clear
+uv sync --extra dev --link-mode=copy
+uv run pytest
+```
+
 ## 不使用 uv 的启动方式
 
 ```powershell
