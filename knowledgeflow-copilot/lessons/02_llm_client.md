@@ -63,15 +63,19 @@ schemas.py 只处理输入输出结构
 LLM_PROVIDER=auto
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-5.5
+DEEPSEEK_API_KEY=
+DEEPSEEK_MODEL=deepseek-v4-flash
+DEEPSEEK_BASE_URL=https://api.deepseek.com
 OPENAI_SYSTEM_PROMPT=你是 KnowledgeFlow Copilot 的学习助手。回答要简洁、准确，适合 Python 大模型应用开发初学者。
 LLM_TIMEOUT_SECONDS=30
 ```
 
-`LLM_PROVIDER` 有三个值：
+`LLM_PROVIDER` 当前支持四个值：
 
-- `auto`：有 `OPENAI_API_KEY` 就用 OpenAI，没有就用 mock。
+- `auto`：有 `DEEPSEEK_API_KEY` 就用 DeepSeek，否则有 `OPENAI_API_KEY` 就用 OpenAI，没有 key 就用 mock。
 - `mock`：强制使用本地 mock。
 - `openai`：强制使用 OpenAI，没有 Key 时返回 503。
+- `deepseek`：强制使用 DeepSeek，没有 Key 时返回 503。
 
 ## 当前接口
 
@@ -118,6 +122,8 @@ def chat(self, message: str, temperature: float) -> LLMResult:
     provider = self._active_provider()
     if provider == "mock":
         return self._mock_chat(message, temperature)
+    if provider == "deepseek":
+        return self._deepseek_chat(message, temperature)
     return self._openai_chat(message)
 ```
 

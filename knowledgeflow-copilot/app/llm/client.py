@@ -1,6 +1,9 @@
+import json
+import re
 from dataclasses import dataclass
 
 from openai import OpenAI, OpenAIError
+from pydantic import ValidationError
 
 from app.core.config import Settings
 from app.schemas import ActionItem, ActionItemsPayload
@@ -45,36 +48,64 @@ class LLMClient:
         self.settings = settings
 
     def status(self) -> LLMStatus:
+        # Resolve the real provider once so status shows the same route chat/extract will use.
+        active_provider = self._active_provider()
         return LLMStatus(
             configured_provider=self.settings.llm_provider,
-            active_provider=self._active_provider(),
-            model=self.settings.openai_model,
-            has_api_key=self._has_openai_key(),
+            active_provider=active_provider,
+            model=self._model_for_provider(active_provider),
+            has_api_key=self._has_key_for_provider(active_provider),
         )
 
     def chat(self, message: str, temperature: float) -> LLMResult:
         provider = self._active_provider()
         if provider == "mock":
             return self._mock_chat(message, temperature)
+        if provider == "deepseek":
+            return self._deepseek_chat(message, temperature)
         return self._openai_chat(message)
 
     def extract_action_items(self, text: str, temperature: float) -> ActionItemExtractionResult:
         provider = self._active_provider()
         if provider == "mock":
             return self._mock_extract_action_items(text)
+        if provider == "deepseek":
+            return self._deepseek_extract_action_items(text, temperature)
         return self._openai_extract_action_items(text, temperature)
 
     def _active_provider(self) -> str:
+        # Explicit provider settings win first. In auto mode, prefer real APIs with keys.
         if self.settings.llm_provider == "mock":
             return "mock"
+        if self.settings.llm_provider == "deepseek":
+            return "deepseek"
         if self.settings.llm_provider == "openai":
             return "openai"
+        if self._has_deepseek_key():
+            return "deepseek"
         if self._has_openai_key():
             return "openai"
         return "mock"
 
     def _has_openai_key(self) -> bool:
         return bool(self.settings.openai_api_key and self.settings.openai_api_key.strip())
+
+    def _has_deepseek_key(self) -> bool:
+        return bool(self.settings.deepseek_api_key and self.settings.deepseek_api_key.strip())
+
+    def _has_key_for_provider(self, provider: str) -> bool:
+        if provider == "deepseek":
+            return self._has_deepseek_key()
+        if provider == "openai":
+            return self._has_openai_key()
+        return False
+
+    def _model_for_provider(self, provider: str) -> str:
+        if provider == "deepseek":
+            return self.settings.deepseek_model
+        if provider == "openai":
+            return self.settings.openai_model
+        return "mock"
 
     def _mock_chat(self, message: str, temperature: float) -> LLMResult:
         words = message.split()
@@ -117,7 +148,43 @@ class LLMClient:
             tokens_used=self._extract_total_tokens(response),
         )
 
+    def _deepseek_client(self) -> OpenAI:
+        if not self._has_deepseek_key():
+            raise LLMConfigurationError("DEEPSEEK_API_KEY is required when LLM_PROVIDER=deepseek.")
+        # DeepSeek exposes an OpenAI-compatible API, so the OpenAI SDK can call it
+        # as long as we point base_url at DeepSeek.
+        return OpenAI(
+            api_key=self.settings.deepseek_api_key,
+            base_url=self.settings.deepseek_base_url,
+            timeout=self.settings.llm_timeout_seconds,
+        )
+
+    def _deepseek_chat(self, message: str, temperature: float) -> LLMResult:
+        client = self._deepseek_client()
+        try:
+            response = client.chat.completions.create(
+                model=self.settings.deepseek_model,
+                messages=[
+                    {"role": "system", "content": self.settings.openai_system_prompt},
+                    {"role": "user", "content": message},
+                ],
+                temperature=temperature,
+            )
+        except OpenAIError as exc:
+            raise LLMProviderError(str(exc)) from exc
+
+        reply = response.choices[0].message.content or ""
+        return LLMResult(
+            reply=reply,
+            provider="deepseek",
+            model=self.settings.deepseek_model,
+            used_mock=False,
+            tokens_used=self._extract_total_tokens(response),
+        )
+
     def _mock_extract_action_items(self, text: str) -> ActionItemExtractionResult:
+        # The mock path is intentionally rule-based: it lets tests exercise the API
+        # shape without spending tokens or depending on network access.
         fragments = self._split_action_fragments(text)
         items = [
             ActionItem(
@@ -158,6 +225,7 @@ class LLMClient:
                     "due_date 保留原文中的时间表达，owner 保留原文中的负责人。"
                 ),
                 input=text,
+                # OpenAI can parse directly into the Pydantic schema.
                 text_format=ActionItemsPayload,
                 temperature=temperature,
             )
@@ -174,7 +242,59 @@ class LLMClient:
             tokens_used=self._extract_total_tokens(response),
         )
 
+    def _deepseek_extract_action_items(
+        self,
+        text: str,
+        temperature: float,
+    ) -> ActionItemExtractionResult:
+        client = self._deepseek_client()
+        try:
+            response = client.chat.completions.create(
+                model=self.settings.deepseek_model,
+                messages=[
+                    {"role": "system", "content": self.settings.openai_system_prompt},
+                    {
+                        "role": "user",
+                        "content": (
+                            "Extract action items from the following text. "
+                            "Return only JSON matching this schema: "
+                            '{"items":[{"title":"string","owner":"string or null",'
+                            '"due_date":"string or null","priority":"low|medium|high",'
+                            '"source_text":"string"}]}\n\n'
+                            f"Text:\n{text}"
+                        ),
+                    },
+                ],
+                # Ask DeepSeek for a JSON object, then validate it ourselves below.
+                response_format={"type": "json_object"},
+                temperature=temperature,
+            )
+        except OpenAIError as exc:
+            raise LLMProviderError(str(exc)) from exc
+
+        raw_content = response.choices[0].message.content or '{"items":[]}'
+        try:
+            # Convert the model's JSON string into a trusted Pydantic object.
+            parsed = ActionItemsPayload.model_validate_json(raw_content)
+        except ValidationError as exc:
+            try:
+                # Fallback for SDK/model variants that return a JSON object-like string
+                # accepted by json.loads but not by Pydantic's direct JSON parser.
+                parsed = ActionItemsPayload.model_validate(json.loads(raw_content))
+            except (json.JSONDecodeError, ValidationError) as parse_exc:
+                message = f"DeepSeek returned invalid action-items JSON: {exc}"
+                raise LLMProviderError(message) from parse_exc
+
+        return ActionItemExtractionResult(
+            items=parsed.items,
+            provider="deepseek",
+            model=self.settings.deepseek_model,
+            used_mock=False,
+            tokens_used=self._extract_total_tokens(response),
+        )
+
     def _split_action_fragments(self, text: str) -> list[str]:
+        # Split one paragraph into candidate task fragments before guessing fields.
         separators = ["\n", "。", "；", ";", "，", ","]
         fragments = [text.strip()]
         for separator in separators:
@@ -205,6 +325,16 @@ class LLMClient:
         return fragment.strip(" -:：，。；;")
 
     def _guess_owner(self, fragment: str) -> str | None:
+        # Handle common Chinese task patterns like "由小李完成..." and "小王今天开发...".
+        owner_patterns = [
+            r"(?:由|负责人[:：]?)(?P<owner>[\u4e00-\u9fffA-Za-z0-9_]{1,20}?)(?:完成|负责|进行|测试|开发|整理|提交|修复|跟进)",
+            r"^(?P<owner>[\u4e00-\u9fff]{2,4})(?:今天|明天|后天|本周|下周|月底|周一|周五|明天前)?(?:完成|测试|开发|整理|提交|修复|跟进)",
+        ]
+        for pattern in owner_patterns:
+            match = re.search(pattern, fragment)
+            if match:
+                return match.group("owner")
+
         markers = ["由", "负责人：", "负责人:"]
         for marker in markers:
             if marker not in fragment:
@@ -216,13 +346,15 @@ class LLMClient:
         return None
 
     def _guess_due_date(self, fragment: str) -> str | None:
-        due_keywords = ["今天", "明天", "后天", "本周", "下周", "月底", "周一", "周五"]
+        # Longer phrases must come first so "明天前" is not shortened to "明天".
+        due_keywords = ["明天前", "今天", "明天", "后天", "本周", "下周", "月底", "周一", "周五"]
         for keyword in due_keywords:
             if keyword in fragment:
                 return keyword
         return None
 
     def _guess_priority(self, fragment: str) -> str:
+        # These simple keyword rules are only for the local mock implementation.
         if any(keyword in fragment for keyword in ["紧急", "尽快", "马上", "高优"]):
             return "high"
         if any(keyword in fragment for keyword in ["可选", "有空", "低优"]):

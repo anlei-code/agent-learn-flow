@@ -17,12 +17,18 @@ class Settings(BaseSettings):
     debug: bool = Field(default=True, validation_alias="APP_DEBUG")
     api_prefix: str = Field(default="/api/v1", validation_alias="APP_API_PREFIX")
     log_level: str = Field(default="INFO", validation_alias="APP_LOG_LEVEL")
-    llm_provider: Literal["auto", "mock", "openai"] = Field(
+    llm_provider: Literal["auto", "mock", "openai", "deepseek"] = Field(
         default="auto",
         validation_alias="LLM_PROVIDER",
     )
     openai_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-5.5", validation_alias="OPENAI_MODEL")
+    deepseek_api_key: str | None = Field(default=None, validation_alias="DEEPSEEK_API_KEY")
+    deepseek_model: str = Field(default="deepseek-v4-flash", validation_alias="DEEPSEEK_MODEL")
+    deepseek_base_url: str = Field(
+        default="https://api.deepseek.com",
+        validation_alias="DEEPSEEK_BASE_URL",
+    )
     openai_system_prompt: str = Field(
         default=DEFAULT_OPENAI_SYSTEM_PROMPT,
         validation_alias="OPENAI_SYSTEM_PROMPT",

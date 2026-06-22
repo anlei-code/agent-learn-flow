@@ -192,8 +192,8 @@ http://127.0.0.1:8000/docs
   "items": [
     {
       "title": "明天前由小李完成接口测试",
-      "owner": "小李完成接口测试",
-      "due_date": "明天",
+      "owner": "小李",
+      "due_date": "明天前",
       "priority": "medium",
       "source_text": "明天前由小李完成接口测试"
     }
@@ -204,3 +204,33 @@ http://127.0.0.1:8000/docs
   "tokens_used": 28
 }
 ```
+
+## 当前进度补充：DeepSeek provider
+
+当前项目已经支持 `mock`、`openai`、`deepseek` 三条 LLM 路径，并通过 `LLM_PROVIDER` 切换：
+
+```env
+LLM_PROVIDER=deepseek
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-5.5
+DEEPSEEK_API_KEY=你的 DeepSeek API Key
+DEEPSEEK_MODEL=deepseek-v4-flash
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+OPENAI_SYSTEM_PROMPT=你是 KnowledgeFlow Copilot 的学习助手。回答要简洁、准确，适合 Python 大模型应用开发初学者。
+LLM_TIMEOUT_SECONDS=30
+```
+
+不要把真实 API Key 提交到 Git；`.env` 是本地文件，`.env.example` 只保留空 key。
+
+新增课程：
+
+- [第 4 课：Provider 切换与 DeepSeek 接入](lessons/04_provider_switching_deepseek.md)
+
+当前验证命令：
+
+```powershell
+.\.venv\Scripts\python -m ruff check .
+.\.venv\Scripts\python -m pytest
+```
+
+应通过 `15` 个测试。

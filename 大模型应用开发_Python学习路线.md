@@ -4,6 +4,21 @@
 适用对象：想从 Python 后端/应用工程方向进入大模型应用开发的人  
 核心目标：能独立做出一个可部署、可评测、可观测、可扩展的大模型应用，而不是只会调用一次 API。
 
+## 当前实践项目进度
+
+更新时间：2026-06-22
+
+当前实践项目：[KnowledgeFlow Copilot](knowledgeflow-copilot/README.md)
+
+已完成课程：
+
+- [第 1 课：FastAPI + Pydantic 项目骨架](knowledgeflow-copilot/lessons/01_fastapi_pydantic.md)
+- [第 2 课：封装 LLM Client](knowledgeflow-copilot/lessons/02_llm_client.md)
+- [第 3 课：结构化输出与信息抽取](knowledgeflow-copilot/lessons/03_structured_output.md)
+- [第 4 课：Provider 切换与 DeepSeek 接入](knowledgeflow-copilot/lessons/04_provider_switching_deepseek.md)
+
+当前代码已经支持 `mock`、`openai`、`deepseek` 三种 provider，并通过 `LLM_PROVIDER` 配置切换。结构化输出接口 `/api/v1/extract/action-items` 已支持本地 mock、OpenAI structured output 预留路径和 DeepSeek JSON + Pydantic 校验路径。
+
 ## 0. 一句话结论
 
 大模型应用开发的主线不是先训练大模型，而是先掌握：

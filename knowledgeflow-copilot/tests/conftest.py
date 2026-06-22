@@ -9,6 +9,7 @@ from app.main import create_app
 def use_mock_llm(monkeypatch):
     monkeypatch.setenv("LLM_PROVIDER", "mock")
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()

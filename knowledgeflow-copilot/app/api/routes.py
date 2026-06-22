@@ -62,6 +62,7 @@ def mock_chat(payload: ChatRequest) -> ChatResponse:
 
 @router.get("/llm/status", response_model=LLMStatusResponse, tags=["llm"])
 def llm_status() -> LLMStatusResponse:
+    # This endpoint is safe for debugging because it never returns the raw API key.
     status = LLMClient(get_settings()).status()
     return LLMStatusResponse(
         configured_provider=status.configured_provider,
@@ -77,8 +78,10 @@ def chat(payload: ChatRequest) -> LLMChatResponse:
     try:
         result = client.chat(payload.message, payload.temperature)
     except LLMConfigurationError as exc:
+        # 503 means the service is not correctly configured for the selected provider.
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except LLMProviderError as exc:
+        # 502 means our app is configured, but the upstream model provider failed.
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     return LLMChatResponse(
@@ -95,6 +98,7 @@ def chat(payload: ChatRequest) -> LLMChatResponse:
 def extract_action_items(payload: ActionItemsRequest) -> ActionItemsResponse:
     client = LLMClient(get_settings())
     try:
+        # Convert free-form text into a list of ActionItem objects.
         result = client.extract_action_items(payload.text, payload.temperature)
     except LLMConfigurationError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -113,12 +117,12 @@ def extract_action_items(payload: ActionItemsRequest) -> ActionItemsResponse:
 @router.get("/study/status", response_model=StudyStatusResponse, tags=["learning"])
 def study_status() -> StudyStatusResponse:
     return StudyStatusResponse(
-        stage_name="第三课：结构化输出与信息抽取",
+        stage_name="第四课：Provider 切换与 DeepSeek 接入",
         goals=[
-            "理解为什么大模型应用需要稳定输出结构",
-            "会用 Pydantic 定义抽取结果",
-            "会通过接口返回 list[ActionItem]",
-            "会用 mock 方式测试结构化输出",
+            "理解 mock、OpenAI、DeepSeek 三种 provider 的切换逻辑",
+            "会用 OpenAI 兼容 base_url 接入 DeepSeek",
+            "会用 Pydantic 校验真实模型返回的 JSON",
+            "会把单元测试和真实 API 验证隔离开",
         ],
-        next_step="阅读第三课讲义，并手动调用 /api/v1/extract/action-items。",
+        next_step="阅读第四课讲义，并确认 /api/v1/llm/status 当前 active_provider 是否符合预期。",
     )

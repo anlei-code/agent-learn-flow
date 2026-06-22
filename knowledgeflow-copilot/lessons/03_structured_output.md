@@ -38,10 +38,17 @@ POST /api/v1/extract/action-items
   "items": [
     {
       "title": "明天前由小李完成接口测试",
-      "owner": "小李完成接口测试",
-      "due_date": "明天",
+      "owner": "小李",
+      "due_date": "明天前",
       "priority": "medium",
       "source_text": "明天前由小李完成接口测试"
+    },
+    {
+      "title": "下周整理学习笔记",
+      "owner": null,
+      "due_date": "下周",
+      "priority": "medium",
+      "source_text": "下周整理学习笔记"
     }
   ],
   "provider": "mock",
@@ -77,8 +84,8 @@ class ActionItem(BaseModel):
 ```json
 {
   "title": "明天前由小李完成接口测试",
-  "owner": "小李完成接口测试",
-  "due_date": "明天",
+  "owner": "小李",
+  "due_date": "明天前",
   "priority": "medium",
   "source_text": "明天前由小李完成接口测试"
 }
@@ -106,6 +113,8 @@ def extract_action_items(self, text: str, temperature: float) -> ActionItemExtra
     provider = self._active_provider()
     if provider == "mock":
         return self._mock_extract_action_items(text)
+    if provider == "deepseek":
+        return self._deepseek_extract_action_items(text, temperature)
     return self._openai_extract_action_items(text, temperature)
 ```
 
@@ -129,18 +138,33 @@ response = client.responses.parse(
 
 这里的 `text_format=ActionItemsPayload` 表示希望 OpenAI 按 Pydantic 模型返回结构化结果。
 
+有 DeepSeek API Key 且 provider 为 DeepSeek 时，走 OpenAI 兼容 Chat Completions：
+
+```python
+response = client.chat.completions.create(
+    model=self.settings.deepseek_model,
+    messages=[...],
+    response_format={"type": "json_object"},
+)
+parsed = ActionItemsPayload.model_validate_json(raw_content)
+```
+
+DeepSeek 返回 JSON 字符串后，项目再用 Pydantic 校验成 `ActionItemsPayload`。
+
 ## 动手练习
 
 练习 1：优化 owner 抽取
 
 - 当前 mock 的 owner 抽取比较粗糙。
 - 把 `明天前由小李完成接口测试` 的 owner 优化成 `小李`。
+- 完成状态：已完成。
 
 练习 2：新增 priority 规则
 
 - 如果文本包含 `紧急`、`尽快`，返回 `high`。
 - 如果文本包含 `有空`、`低优`，返回 `low`。
 - 给这两个场景补测试。
+- 完成状态：已完成。
 
 练习 3：补 OpenAI 配置错误测试
 
@@ -148,6 +172,17 @@ response = client.responses.parse(
 - 删除 `OPENAI_API_KEY`。
 - 调用 `/api/v1/extract/action-items`。
 - 断言返回 503。
+- 完成状态：已完成。
+
+## 本课练习完成记录
+
+- `_guess_owner()` 已支持 `由小李完成...` 和 `小王今天开发...` 这类常见中文句式。
+- `_guess_due_date()` 已优先识别 `明天前`，避免被截短成 `明天`。
+- `_guess_priority()` 已支持 `紧急`、`尽快`、`有空`、`低优`。
+- 已新增 OpenAI 结构化抽取缺少 API Key 时返回 503 的测试。
+- 当前验收结果：`pytest` 15 个测试通过，`ruff check .` 通过。
+
+下一课进入：[第 4 课：Provider 切换与 DeepSeek 接入](04_provider_switching_deepseek.md)。
 
 ## 本课验收
 
